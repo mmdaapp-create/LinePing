@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinePing | شبکه اختصاصی پینگ پایین</title>
+    <style>
+        :root {
+            --primary: #00d4ff;
+            --accent: #7000ff;
+            --bg: #050505;
+            --card: #111111;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Tahoma', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.8;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 10%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid #222;
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: 900;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: -1px;
+        }
+
+        .support-link {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 14px;
+            border: 1px solid var(--primary);
+            padding: 5px 15px;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        .support-link:hover {
+            background: var(--primary);
+            color: #000;
+        }
+
+        .hero {
+            padding: 100px 10%;
+            text-align: center;
+            background: radial-gradient(circle at top, #003a4d 0%, #050505 70%);
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            font-weight: 900;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            color: #888;
+            max-width: 700px;
+            margin: 0 auto 40px;
+        }
+
+        .pricing {
+            padding: 60px 10%;
+        }
+
+        .pricing-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .price-card {
+            background: var(--card);
+            border-radius: 25px;
+            padding: 50px 30px;
+            border: 1px solid #222;
+            transition: 0.5s;
+            text-align: center;
+            position: relative;
+        }
+
+        .price-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1);
+        }
+
+        .price-card h3 { font-size: 24px; margin-bottom: 10px; color: #aaa; }
+        .price-card .amount { font-size: 36px; color: #fff; font-weight: bold; margin-bottom: 20px; }
+        .price-card ul { list-style: none; padding: 0; margin-bottom: 40px; color: #777; font-size: 15px; }
+        .price-card ul li { margin: 12px 0; border-bottom: 1px solid #1a1a1a; padding-bottom: 8px; }
+
+        .btn-buy {
+            display: block;
+            background: var(--primary);
+            color: #000;
+            padding: 15px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: 0.3s;
+            font-size: 18px;
+        }
+
+        .btn-buy:hover {
+            background: #fff;
+            transform: scale(1.05);
+        }
+
+        .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--accent);
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        footer {
+            padding: 60px;
+            text-align: center;
+            border-top: 1px solid #111;
+            color: #444;
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.2rem; }
+            .pricing-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">LinePing</div>
+        <a href="https://t.me/SuportLinePing" class="support-link">پشتیبانی تلگرام</a>
+    </header>
+
+    <section class="hero">
+        <h1>اتصال هوشمند، <span style="color: var(--primary);">بدون مرز</span></h1>
+        <p>تجربه پایداری واقعی با سرویس‌های نسل جدید V2Ray. بهینه‌شده برای دور زدن فیلترینگ در اپراتورهای همراه و خانگی.</p>
+        <div style="display: flex; justify-content: center; gap: 20px;">
+            <div style="font-size: 12px; color: #00ff88;">● سرورها فعال</div>
+            <div style="font-size: 12px; color: #888;">● آپتایم ۹۹.۹٪</div>
+        </div>
+    </section>
+
+    <section class="pricing" id="plans">
+        <div class="pricing-container">
+            
+            <div class="price-card">
+                <h3>یک‌ماهه نقره‌ای</h3>
+                <div class="amount">۶۰,۰۰۰ تومان</div>
+                <ul>
+                    <li>۳۰ گیگابایت ترافیک</li>
+                    <li>تک کاربره</li>
+                    <li>پشتیبانی ۲۴ ساعته</li>
+                </ul>
+                <a href="https://t.me/blueping_online_bot" class="btn-buy">خرید از ربات</a>
+            </div>
+
+            <div class="price-card" style="border-color: #333; background: linear-gradient(145deg, #111, #1a1a1a);">
+                <div class="badge">پرفروش</div>
+                <h3>یک‌ماهه طلایی</h3>
+                <div class="amount" style="color: var(--primary);">۱۲۰,۰۰۰ تومان</div>
+                <ul>
+                    <li>۸۰ گیگابایت ترافیک</li>
+                    <li>دو کاربره همزمان</li>
+                    <li>اولویت پهنای باند</li>
+                </ul>
+                <a href="https://t.me/blueping_online_bot" class="btn-buy" style="box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3);">خرید و تحویل آنی</a>
+            </div>
+
+            <div class="price-card">
+                <h3>سه ماهه الماس</h3>
+                <div class="amount">۳۰۰,۰۰۰ تومان</div>
+                <ul>
+                    <li>۲۰۰ گیگابایت ترافیک</li>
+                    <li>سه کاربره</li>
+                    <li>آی‌پی ثابت اختصاصی</li>
+                </ul>
+                <a href="https://t.me/blueping_online_bot" class="btn-buy">خرید از ربات</a>
+            </div>
+            
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 LINEPING NETWORK. ALL RIGHTS RESERVED.</p>
+        <p>ارتباط با مدیریت: @SuportLinePing</p>
+    </footer>
+
+</body>
+</html>
