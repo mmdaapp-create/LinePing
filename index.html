@@ -393,7 +393,7 @@ function sendToPv() {
     let gig = document.getElementById('gigAmount').value;
     let price = (gig * 4000).toLocaleString();
     if(gig > 0) {
-        let msg = `سلام مهدی، درخواست خرید ${gig} گیگ دارم. مبلغ ${price} تومان واریز شد.`;
+        let msg = `سلام LinePing، درخواست خرید ${gig} گیگ دارم. مبلغ ${price} تومان واریز شد.`;
         window.location.href = `https://t.me/SuportLinePing?text=${encodeURIComponent(msg)}`;
     } else {
         alert('لطفاً مقدار گیگ را وارد کنید');
