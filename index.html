@@ -222,6 +222,39 @@
         <p>&copy; 2026 LINEPING NETWORK. ساخته شده توسط تیم LinePing سازنده:@imehdizen.</p>
         <p>ارتباط با مدیریت: @SuportLinePing</p>
     </footer>
+<div style="background: #242f3e; color: white; padding: 10px; border-radius: 8px; width: fit-content; font-family: sans-serif;">
+    وضعیت اتصال: <span id="ping-status">در حال محاسبه...</span>
+</div>
 
+<script>
+    
+async function checkPing() {
+    const startTime = Date.now();
+    const statusElement = document.getElementById('ping-status');
+    
+    try {
+        // ارسال درخواست به سرور شما (باید پروتکل HTTPS باشد تا در مینی‌آپ کار کند)
+        // اگر هنوز SSL سرور را فعال نکردید، از آدرس IP استفاده کنید
+        await fetch('https://blueping.sbs', { mode: 'no-cors', cache: 'no-cache' }); 
+        
+        const endTime = Date.now();
+        const ping = endTime - startTime;
+        
+        // تغییر رنگ بر اساس کیفیت پینگ
+        let color = "#4caf50"; // سبز
+        if (ping > 200) color = "#ffeb3b"; // زرد
+        if (ping > 400) color = "#f44336"; // قرمز
+        
+        statusElement.innerHTML = `<b style="color:${color}">${ping} ms</b>`;
+    } catch (error) {
+        statusElement.innerHTML = "<b style="color:#f44336">قطع می‌باشد</b>";
+    }
+}
+
+// هر 5 ثانیه یکبار پینگ را بروزرسانی کن
+setInterval(checkPing, 5000);
+checkPing(); // اجرای اولیه
+</script>
+    
 </body>
 </html>
