@@ -379,7 +379,7 @@ checkPing(); // اجرای اولیه
     </div>
 
     <button class="glowing-btn" onclick="sendToPv()">
-        ثبت و ارسال رسید به پی‌وی @imehdizen
+        ثبت و ارسال رسید به پی‌وی پشتیبانی 
     </button>
 </div>
 
@@ -394,7 +394,7 @@ function sendToPv() {
     let price = (gig * 4000).toLocaleString();
     if(gig > 0) {
         let msg = `سلام مهدی، درخواست خرید ${gig} گیگ دارم. مبلغ ${price} تومان واریز شد.`;
-        window.location.href = `https://t.me/imehdizen?text=${encodeURIComponent(msg)}`;
+        window.location.href = `https://t.me/SuportLinePing?text=${encodeURIComponent(msg)}`;
     } else {
         alert('لطفاً مقدار گیگ را وارد کنید');
     }
