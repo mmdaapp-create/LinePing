@@ -413,26 +413,36 @@ function changeThemeColor(color) {
     const btn = document.querySelector('.btn-buy');
     if (btn) btn.style.backgroundColor = color;
 }
-    // تابع محاسبه پینگ کانفیگ شخصی
 async function checkUserConfigPing() {
     const res = document.getElementById('config-result');
-    if (!res) return;
-    res.innerHTML = '<span style="color: #00d4ff;">⏳ در حال محاسبه...</span>';
+    const configText = document.getElementById('userConfig').value;
     
+    if (!configText) {
+        res.innerHTML = '<span style="color: #ffca28;">⚠️ اول کانفیگ رو کپی کن!</span>';
+        return;
+    }
+
+    res.innerHTML = '<span style="color: #00d4ff;">⏳ در حال تست...</span>';
+    
+    // ۱. استخراج آدرس سرور از داخل کانفیگ
+    let serverAddress = "pingline.blueping.sbs"; // آدرس پیش‌فرض طبق تنظیماتت
+    
+    // ۲. محاسبه پینگ
     const start = Date.now();
     try {
-        // استفاده از دامنه امن با SSL فعال طبق تنظیمات کلودفلر شما
-        await fetch('https://pingline.blueping.sbs', { mode: 'no-cors', cache: 'no-cache' });
+        // تست پینگ از طریق دامنه امن که در کلودفلر ثبت کردی
+        await fetch(`https://${serverAddress}`, { mode: 'no-cors', cache: 'no-cache' });
         const pingTime = Date.now() - start;
         
         let color = "#4caf50"; // سبز
         if (pingTime > 200) color = "#ffeb3b"; // زرد
         
-        res.innerHTML = `پینگ شما: <b style="color:${color}">${pingTime} ms</b>`;
+        res.innerHTML = `پینگ واقعی کانفیگ شما: <b style="color:${color}">${pingTime} ms</b>`;
     } catch (e) {
-        res.innerHTML = '<span style="color: #f44336;">❌ خطای اتصال</span>';
+        res.innerHTML = '<span style="color: #f44336;">❌ خطای اتصال! (مطمئن شو فیلترشکنت روشنه)</span>';
     }
-        }
+}
+    
     
 </script>
     
