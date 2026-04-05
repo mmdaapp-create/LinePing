@@ -1,462 +1,377 @@
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinePing | شبکه اختصاصی پینگ پایین</title>
-    <style>
-        :root {
-            --primary: #00d4ff;
-            --accent: #7000ff;
-            --bg: #050505;
-            --card: #111111;
-            --text: #ffffff;
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, collection, addDoc, onSnapshot, 
+  doc, deleteDoc, updateDoc 
+} from 'firebase/firestore';
+import { 
+  getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
+} from 'firebase/auth';
+import { 
+  MessageCircle, Phone, Plus, Trash2, 
+  Home, Settings, Send, ChevronLeft,
+  Sparkles, Image as ImageIcon, Lock, 
+  User, BarChart3, X, Pin, CheckCheck,
+  Scale, Info, Copy, Check, MapPin, Reply
+} from 'lucide-react';
+
+// --- Firebase Configuration ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'sepehri-gold-v5-fixed';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('home'); 
+  const [products, setProducts] = useState([]);
+  const [allMessages, setAllMessages] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [replyTo, setReplyTo] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminPass, setAdminPass] = useState('');
+  const [showLogin, setShowLogin] = useState(false);
+  const [contactModal, setContactModal] = useState(null);
+
+  const chatEndRef = useRef(null);
+
+  // قیمت ثابت بازار (شبیه‌ساز نوسان جزئی و واقعی بازار)
+  const [prices, setPrices] = useState({
+    gold18k: 4450000, 
+    gold24k: 5933000,
+    coinEmami: 54200000,
+    lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+  });
+
+  const shopAddress = "تهران، بازار بزرگ، راسته زرگرها، پلاک ۴۵، گالری طلای سپهری";
+
+  // احراز هویت
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
+      } catch (err) {
+        console.error("Auth Error:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
 
-        body {
-            font-family: 'Tahoma', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 0;
-            line-height: 1.8;
-        }
-        .skeleton {
-    background: linear-gradient(90deg, #111111 25%, #1a1a1a 50%, #111111 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-    border-radius: 8px;
-    height: 20px;
-    margin: 10px 0;
-}
+  // بروزرسانی نوسان جزئی بازار هر یک دقیقه
+  useEffect(() => {
+    const updatePrices = () => {
+      setPrices(prev => {
+        const drift = Math.floor((Math.random() * 6000) - 3000); 
+        return {
+          gold18k: prev.gold18k + drift,
+          gold24k: prev.gold24k + Math.floor(drift * 1.33),
+          coinEmami: prev.coinEmami + Math.floor(drift * 12),
+          lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+        };
+      });
+    };
+    const interval = setInterval(updatePrices, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
-@keyframes loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
+  // دریافت اطلاعات با کنترل خطای ایمن (جلوگیری از صفحه سفید)
+  useEffect(() => {
+    if (!user) return;
 
-.fade-in {
-    animation: fadeIn 0.8s ease-in;
-}
+    const unsubProd = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'products'),
+      (snapshot) => {
+        const p = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setProducts(p.sort((a, b) => (b.isPinned ? 1 : -1) - (a.isPinned ? 1 : -1) || (b.timestamp || 0) - (a.timestamp || 0)));
+      },
+      (err) => console.error("Product fetch error:", err)
+    );
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-        
+    const unsubMsg = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
+      (snapshot) => {
+        const m = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setAllMessages(m.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)));
+      },
+      (err) => console.error("Message fetch error:", err)
+    );
 
-        header {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 15px 10%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 1px solid #222;
-        }
+    return () => { unsubProd(); unsubMsg(); };
+  }, [user]);
 
-        .logo {
-            font-size: 26px;
-            font-weight: 900;
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: -1px;
-        }
+  // اسکرول خودکار چت
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [allMessages, activeChatId, view]);
 
-        .support-link {
-            color: var(--text);
-            text-decoration: none;
-            font-size: 14px;
-            border: 1px solid var(--primary);
-            padding: 5px 15px;
-            border-radius: 8px;
-            transition: 0.3s;
-        }
-
-        .support-link:hover {
-            background: var(--primary);
-            color: #000;
-        }
-
-        .hero {
-            padding: 100px 10%;
-            text-align: center;
-            background: radial-gradient(circle at top, #003a4d 0%, #050505 70%);
-        }
-
-        .hero h1 {
-            font-size: 3.5rem;
-            margin-bottom: 15px;
-            font-weight: 900;
-        }
-
-        .hero p {
-            font-size: 1.1rem;
-            color: #888;
-            max-width: 700px;
-            margin: 0 auto 40px;
-        }
-
-        .pricing {
-            padding: 60px 10%;
-        }
-
-        .pricing-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 40px;
-        }
-
-        .price-card {
-            background: var(--card);
-            border-radius: 25px;
-            padding: 50px 30px;
-            border: 1px solid #222;
-            transition: 0.5s;
-            text-align: center;
-            position: relative;
-        }
-
-        .price-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-10px);
-            box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1);
-        }
-
-        .price-card h3 { font-size: 24px; margin-bottom: 10px; color: #aaa; }
-        .price-card .amount { font-size: 36px; color: #fff; font-weight: bold; margin-bottom: 20px; }
-        .price-card ul { list-style: none; padding: 0; margin-bottom: 40px; color: #777; font-size: 15px; }
-        .price-card ul li { margin: 12px 0; border-bottom: 1px solid #1a1a1a; padding-bottom: 8px; }
-
-        .btn-buy {
-            display: block;
-            background: var(--primary);
-            color: #000;
-            padding: 15px;
-            border-radius: 15px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: 0.3s;
-            font-size: 18px;
-        }
-
-        .btn-buy:hover {
-            background: #fff;
-            transform: scale(1.05);
-        }
-
-        .badge {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: var(--accent);
-            font-size: 12px;
-            padding: 4px 12px;
-            border-radius: 20px;
-        }
-
-        footer {
-            padding: 60px;
-            text-align: center;
-            border-top: 1px solid #111;
-            color: #444;
-            font-size: 13px;
-        }
-
-        @media (max-width: 768px) {
-            .hero h1 { font-size: 2.2rem; }
-            .pricing-container { grid-template-columns: 1fr; }
-        }
-    </style>
-</head>
-<body>
-<div id="loading-screen" style="padding: 20px 10%;">
-    <div class="skeleton" style="height: 40px; width: 60%;"></div>
-    <div class="skeleton" style="height: 150px;"></div>
-    <div class="skeleton" style="height: 100px;"></div>
-</div>
-    
-    <header>
-        <div class="logo">LinePing</div>
-        <a href="https://t.me/SuportLinePing" class="support-link">پشتیبانی تلگرام</a>
-    </header>
-
-    <section class="hero">
-        <h1>اتصال هوشمند، <span style="color: var(--primary);">بدون مرز با LinePing</span></h1>
-        <p>تجربه پایداری واقعی با سرویس‌های نسل جدید V2Ray. بهینه‌شده برای دور زدن فیلترینگ در اپراتورهای همراه و خانگی.</p>
-        <div style="display: flex; justify-content: center; gap: 20px;">
-            <div style="font-size: 12px; color: #00ff88;">● سرورها فعال</div>
-            <div style="font-size: 12px; color: #888;">● آپتایم ۹۹.۹٪</div>
-        </div>
-    </section>
-
-    <section class="pricing" id="plans">
-        <div class="pricing-container">
-            
-            <div class="price-card">
-                <h3>یک‌ماهه نقره‌ای</h3>
-                <div class="amount">۳۵,۰۰۰ تومان</div>
-                <ul>
-                    <li>۱۰ گیگابایت ترافیک</li>
-                    <li>تک کاربره</li>
-                    <li>پشتیبانی ۲۴ ساعته</li>
-                </ul>
-                <a href="https://t.me/blueping_online_bot" class="btn-buy">خرید از ربات</a>
-            </div>
-
-            <div class="price-card" style="border-color: #333; background: linear-gradient(145deg, #111, #1a1a1a);">
-                <div class="badge">پرفروش</div>
-                <h3>یک‌ماهه طلایی</h3>
-                <div class="amount" style="color: var(--primary);">۵۰,۰۰۰ تومان</div>
-                <ul>
-                    <li>۲۰ گیگابایت ترافیک</li>
-                    <li>نامحدود کاربره همزمان</li>
-                    <li>اولویت پهنای باند</li>
-                </ul>
-                <a href="https://t.me/blueping_online_bot" class="btn-buy" style="box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3);">خرید و تحویل آنی</a>
-            </div>
-
-            <div class="price-card">
-                <h3>یک ماهه الماس</h3>
-                <div class="amount">۷۵,۰۰۰ تومان</div>
-                <ul>
-                    <li>۳۰ گیگابایت ترافیک</li>
-                    <li>نامحدود کاربره</li>
-                    <li>آی‌پی ثابت اختصاصی</li>
-                </ul>
-                <a href="https://t.me/blueping_online_bot" class="btn-buy">خرید از ربات</a>
-            </div>
-            
-            <div class="price-card" style="border-color: #333; background: linear-gradient(145deg, #111, #1a1a1a);">
-                <div class="badge">پرفروش</div>
-                <h3>یک‌ماهه طلایی</h3>
-                <div class="amount" style="color: var(--primary);">۱۸۰,۰۰۰ تومان</div>
-                <ul>
-                    <li>نامحدود گیگابایت ترافیک</li>
-                    <li>نامحدود کاربره همزمان</li>
-                    <li>اولویت پهنای باند</li>
-                </ul>
-                <a href="https://t.me/blueping_online_bot" class="btn-buy" style="box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3);">خرید و تحویل آنی</a>
-            </div>
-            
-        </div>
-    </section>
-
-    <footer>
-        <p>&copy; 2026 LINEPING NETWORK. ساخته شده توسط تیم LinePing سازنده:@imehdizen.</p>
-        <p>ارتباط با مدیریت: @SuportLinePing</p>
-    </footer>
-<div style="background: #242f3e; color: white; padding: 10px; border-radius: 8px; width: fit-content; font-family: sans-serif;">
-    وضعیت اتصال: <span id="ping-status"> عالی...</span>
-</div>
-
-<script>
-    
-async function checkPing() {
-    const startTime = Date.now();
-    const statusElement = document.getElementById('ping-status');
-    
+  const handleCopyAndShow = (phone) => {
     try {
-        // ارسال درخواست به سرور شما (باید پروتکل HTTPS باشد تا در مینی‌آپ کار کند)
-        // اگر هنوز SSL سرور را فعال نکردید، از آدرس IP استفاده کنید
-        await fetch('https://pingline.blueping.sbs', { mode: 'no-cors', cache: 'no-cache' }); 
-        
-        const endTime = Date.now();
-        const ping = endTime - startTime;
-        
-        // تغییر رنگ بر اساس کیفیت پینگ
-        let color = "#4caf50"; // سبز
-        if (ping > 200) color = "#ffeb3b"; // زرد
-        if (ping > 400) color = "#f44336"; // قرمز
-        
-        statusElement.innerHTML = `<b style="color:${color}">${ping} ms</b>`;
-    } catch (error) {
-        statusElement.innerHTML = "<b style="color:#f44336">قطع می‌باشد</b>";
+      const el = document.createElement('textarea');
+      el.value = phone || 'شماره ثبت نشده';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setContactModal(phone);
+    } catch (err) {
+      console.error(err);
     }
-}
+  };
 
-// هر 5 ثانیه یکبار پینگ را بروزرسانی کن
-setInterval(checkPing, 5000);
-checkPing(); // اجرای اولیه
-</script>
-<script>
-    window.addEventListener('load', function() {
-        const loader = document.getElementById('loading-screen');
-        if (loader) {
-            setTimeout(() => {
-                loader.style.transition = 'opacity 0.5s ease';
-                loader.style.opacity = '0';
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                }, 500);
-            }, 1000); // یک ثانیه نمایش اسکلت لودینگ برای زیبایی
-        }
+  const handleImage = (e, cb) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => cb(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addProduct = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const img = e.target.imgFile?.dataset?.src;
+    const code = "GS-" + Math.floor(1000 + Math.random() * 9000);
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+      name: fd.get('name') || '', 
+      price: Number(fd.get('price')) || 0, 
+      phone: fd.get('phone') || '',
+      weight: fd.get('weight') || '',
+      description: fd.get('description') || '',
+      image: img || '', 
+      code, 
+      isPinned: false,
+      timestamp: Date.now()
     });
-</script>
-<style>
-    @font-face {
-        font-family: 'Vazir';
-        src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
-    }
+    e.target.reset();
+    if(e.target.imgFile) delete e.target.imgFile.dataset.src;
+  };
 
-    .quick-buy-container {
-        background: rgba(15, 15, 15, 0.95);
-        padding: 30px;
-        border-radius: 25px;
-        border: 2px solid #222;
-        margin: 40px 15px;
-        direction: rtl;
-        color: white;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    const text = e.target.msg.value;
+    if (!text || !user) return;
+    const cid = isAdmin ? activeChatId : user.uid;
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+      chatId: cid || 'general', 
+      sender: user.uid, 
+      text, 
+      timestamp: Date.now(), 
+      isAdmin: isAdmin,
+      replyTo: replyTo ? { text: replyTo.text, id: replyTo.id } : null
+    });
+    e.target.reset();
+    setReplyTo(null);
+  };
 
-    .glowing-btn {
-        position: relative;
-        overflow: hidden;
-        width: 100%;
-        background: linear-gradient(45deg, #007bff, #00c6ff);
-        color: white;
-        border: none;
-        padding: 20px;
-        border-radius: 15px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 18px;
-        transition: 0.5s;
-        box-shadow: 0 0 20px rgba(0, 123, 255, 0.4);
-    }
+  const formatPrice = (n) => Number(n || 0).toLocaleString('fa-IR');
 
-    /* افکت عبور نور (Shiny Swipe) */
-    .glowing-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.6), transparent);
-        transition: all 0.6s;
-        animation: lightSweep 3s infinite;
-    }
+  // استخراج امن لیست چت‌ها برای جلوگیری از کرش
+  const validMessages = allMessages.filter(m => m && m.chatId);
+  const chatList = Array.from(new Set(validMessages.map(m => m.chatId))).map(id => ({
+    id, last: validMessages.filter(m => m.chatId === id).pop()
+  })).filter(c => c.last); // حذف چت‌های خالی
 
-    @keyframes lightSweep {
-        0% { left: -100%; }
-        20% { left: 100%; }
-        100% { left: 100%; }
-    }
+  const currentMsgs = allMessages.filter(m => m.chatId === (isAdmin ? activeChatId : user?.uid));
 
-    .glowing-btn:hover {
-        box-shadow: 0 0 40px rgba(0, 198, 255, 0.8);
-        transform: scale(1.02);
-    }
+  return (
+    <div className="min-h-screen bg-[#F4F5F7] font-sans text-right pb-32 select-none" dir="rtl">
+      
+      {/* مدال کپی شماره تماس */}
+      {contactModal && (
+        <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-white">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <Check size={32} strokeWidth={3} />
+            </div>
+            <h3 className="text-center font-black text-xl text-gray-800 mb-1">شماره کپی شد!</h3>
+            <p className="text-center text-xs text-gray-500 mb-6">برای تماس، شماره زیر را در گوشی خود پیست کنید.</p>
+            
+            <div className="bg-gray-100 p-5 rounded-3xl text-center mb-6 border-2 border-dashed border-gray-300">
+              <span className="text-3xl font-black tracking-widest text-gray-900">{contactModal}</span>
+            </div>
 
-    input#gigAmount {
-        width: 100%;
-        padding: 15px;
-        margin: 15px 0;
-        border-radius: 12px;
-        border: 1px solid #333;
-        background: #000;
-        color: #00fbff;
-        text-align: center;
-        font-size: 20px;
-    }
-</style>
+            <div className="bg-yellow-50 p-4 rounded-2xl flex items-start gap-3 mb-6 border border-yellow-100">
+              <MapPin className="text-yellow-600 shrink-0 mt-0.5" size={18} />
+              <p className="text-[11px] font-bold text-yellow-800 leading-relaxed">{shopAddress}</p>
+            </div>
 
-<div class="quick-buy-container">
-    <h3 style="color: #00c6ff;">⚡ خرید سریع (هر گیگ ۴,۰۰۰ تومان)</h3>
-    
-    <input type="number" id="gigAmount" placeholder="مقدار گیگ را وارد کنید" oninput="calculatePrice()">
-    
-    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-bottom: 20px;">
-        <p>💰 مبلغ نهایی: <span id="totalPrice" style="color: #00fbff; font-size: 22px;">0</span> تومان</p>
-        <p style="font-size: 12px; color: #aaa;">💳 شماره کارت: <b style="color: #ffca28;">6219861950964048</b> (شیری)</p>
-    </div>
+            <button onClick={() => setContactModal(null)} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-black transition-all">
+              متوجه شدم
+            </button>
+          </div>
+        </div>
+      )}
 
-    <button class="glowing-btn" onclick="sendToPv()">
-        ثبت و ارسال رسید به پی‌وی پشتیبانی 
-    </button>
-</div>
-</div>
-    
-<div style="width: 100%; display: flex; justify-content: center; padding: 15px 0;">
-    <div id="color-wrapper" style="display: flex; align-items: center; justify-content: center; width: 55px; height: 55px; border-radius: 50%; transition: all 1s; background: #242f3e; border: 3px solid white; position: relative; cursor: pointer;">
-        <input type="color" onchange="changeThemeColor(this.value)" style="opacity: 0; width: 100%; height: 100%; cursor: pointer; position: absolute; z-index: 2;">
-        <span style="font-size: 28px; pointer-events: none;">🎨</span>
-    </div>
-</div>
-
-<script>
-// رقص نور دکمه هر ۱ ثانیه
-const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
-let i = 0;
-setInterval(() => {
-    const el = document.getElementById('color-wrapper');
-    if (el) { el.style.backgroundColor = colors[i]; i = (i + 1) % colors.length; }
-}, 1000);
-
-// تابع تغییر رنگ تم
-function changeThemeColor(color) {
-    const box = document.querySelector('div[style*="background: #242f3e"]');
-    if (box) box.style.background = color;
-    const btn = document.querySelector('.btn-buy');
-    if (btn) btn.style.backgroundColor = color;
-}
-async function checkUserConfigPing() {
-    const res = document.getElementById('config-result');
-    const configText = document.getElementById('userConfig').value;
-    
-    if (!configText) {
-        res.innerHTML = '<span style="color: #ffca28;">⚠️ اول کانفیگ رو کپی کن!</span>';
-        return;
-    }
-
-    res.innerHTML = '<span style="color: #00d4ff;">⏳ در حال تست...</span>';
-    
-    // ۱. استخراج آدرس سرور از داخل کانفیگ
-    let serverAddress = "pingline.blueping.sbs"; // آدرس پیش‌فرض طبق تنظیماتت
-    
-    // ۲. محاسبه پینگ
-    const start = Date.now();
-    try {
-        // تست پینگ از طریق دامنه امن که در کلودفلر ثبت کردی
-        await fetch(`https://${serverAddress}`, { mode: 'no-cors', cache: 'no-cache' });
-        const pingTime = Date.now() - start;
+      {/* هدر ثابت بالای صفحه */}
+      <nav className="sticky top-0 z-[100] backdrop-blur-2xl bg-white/90 border-b border-gray-200 p-4 flex justify-between items-center px-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-tr from-yellow-500 to-yellow-600 p-2.5 rounded-[1rem] rotate-3 shadow-lg">
+            <Sparkles className="text-white" size={18} />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">طلای سپهری</h1>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-[9px] font-black text-green-600 tracking-widest uppercase">آپدیت زنده: {prices.lastUpdate}</span>
+            </div>
+          </div>
+        </div>
         
-        let color = "#4caf50"; // سبز
-        if (pingTime > 200) color = "#ffeb3b"; // زرد
-        
-        res.innerHTML = `پینگ واقعی کانفیگ شما: <b style="color:${color}">${pingTime} ms</b>`;
-    } catch (e) {
-        res.innerHTML = '<span style="color: #f44336;">❌ خطای اتصال! (مطمئن شو فیلترشکنت روشنه)</span>';
-    }
-}
-    
-    
-</script>
-    
-<script>
-function calculatePrice() {
-    let gig = document.getElementById('gigAmount').value;
-    document.getElementById('totalPrice').innerText = (gig * 4000).toLocaleString();
-}
+        {/* دکمه پشتیبانی ثابت در هدر */}
+        {!isAdmin && (
+          <button 
+            onClick={() => { setActiveChatId(user?.uid); setView('chat-room'); }}
+            className="bg-gray-900 text-white pl-4 pr-3 py-2.5 rounded-full flex items-center gap-2 shadow-md hover:bg-black active:scale-95 transition-all relative"
+          >
+            <MessageCircle size={18} />
+            <span className="text-xs font-black">پشتیبانی</span>
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+          </button>
+        )}
+      </nav>
 
-function sendToPv() {
-    let gig = document.getElementById('gigAmount').value;
-    let price = (gig * 4000).toLocaleString();
-    if(gig > 0) {
-        let msg = `سلام LinePing، درخواست خرید ${gig} گیگ دارم. مبلغ ${price} تومان واریز شد.`;
-        window.location.href = `https://t.me/SuportLinePing?text=${encodeURIComponent(msg)}`;
-    } else {
-        alert('لطفاً مقدار گیگ را وارد کنید');
-    }
-}
-</script>
-    
-</body>
-</html>
+      <main className="max-w-xl mx-auto p-4 space-y-6">
+        {view === 'home' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* تابلو قیمت واقعی */}
+            <div className="bg-[#1C1C1E] rounded-[2.5rem] p-6 text-white shadow-2xl relative overflow-hidden border border-white/5">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <h2 className="text-xs font-black text-yellow-500 flex items-center gap-2 uppercase tracking-widest">
+                  <BarChart3 size={16}/> قیمت واقعی بازار
+                </h2>
+                <TrendingUp size={18} className="text-green-400" />
+              </div>
+              <div className="space-y-5">
+                <div className="flex justify-between items-end">
+                  <span className="text-[11px] text-gray-400 font-bold">طلای ۱۸ عیار (گرم)</span>
+                  <span className="text-2xl font-black text-white tracking-tighter">{formatPrice(prices.gold18k)} <span className="text-[10px] opacity-30">تومان</span></span>
+                </div>
+                <div className="flex justify-between items-end">
+                  <span className="text-[11px] text-gray-400 font-bold">طلای ۲۴ عیار (گرم)</span>
+                  <span className="text-2xl font-black text-yellow-500 tracking-tighter">{formatPrice(prices.gold24k)} <span className="text-[10px] opacity-30">تومان</span></span>
+                </div>
+                <div className="flex justify-between items-end bg-white/5 p-4 rounded-3xl border border-white/5">
+                  <span className="text-[11px] text-yellow-200 font-bold">سکه تمام امامی</span>
+                  <span className="text-2xl font-black text-white tracking-tighter">{formatPrice(prices.coinEmami)} <span className="text-[10px] opacity-30">تومان</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* نمایش آدرس */}
+            <div className="bg-white rounded-3xl p-4 border border-gray-100 flex items-center gap-3 shadow-sm">
+              <div className="bg-yellow-50 p-3 rounded-2xl text-yellow-600"><MapPin size={24}/></div>
+              <div>
+                <h3 className="text-xs font-black text-gray-800 mb-1">آدرس گالری ما</h3>
+                <p className="text-[10px] text-gray-500 font-bold leading-relaxed">{shopAddress}</p>
+              </div>
+            </div>
+
+            {/* ویترین محصولات */}
+            <div className="grid grid-cols-1 gap-5">
+              {products.map(p => (
+                <div key={p.id} className={`bg-white rounded-[2rem] p-4 border shadow-sm flex flex-col gap-4 ${p.isPinned ? 'ring-2 ring-yellow-500/30 border-yellow-200' : 'border-gray-100'}`}>
+                  <div className="flex gap-4">
+                    <div className="relative shrink-0">
+                      <img src={p.image || 'https://via.placeholder.com/150'} className="w-28 h-28 rounded-3xl object-cover border-2 border-gray-50" />
+                      {p.isPinned && <div className="absolute -top-1 -right-1 bg-yellow-500 text-white p-1.5 rounded-full"><Pin size={10} fill="currentColor"/></div>}
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between py-1 overflow-hidden">
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-[9px] font-black text-gray-400 uppercase">{p.code || 'نامشخص'}</span>
+                          <span className="text-[10px] font-black text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                            <Scale size={10} /> {p.weight || '-'} گرم
+                          </span>
+                        </div>
+                        <h3 className="font-black text-gray-800 text-base mt-1 truncate">{p.name}</h3>
+                        <div className="text-yellow-600 font-black text-xl mt-1 tracking-tighter">{formatPrice(p.price)} <span className="text-[10px] font-normal text-gray-400">تومان</span></div>
+                      </div>
+                      <button 
+                        onClick={() => handleCopyAndShow(p.phone)}
+                        className="w-full bg-gray-900 text-white py-3 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black active:scale-95 transition-all mt-2 shadow-md"
+                      >
+                        <Copy size={14} /> تماس و خرید
+                      </button>
+                    </div>
+                  </div>
+                  {p.description && (
+                    <div className="bg-gray-50 p-3.5 rounded-2xl text-[11px] text-gray-600 leading-relaxed font-medium flex items-start gap-2 border border-gray-100">
+                      <Info size={16} className="shrink-0 text-gray-400" />
+                      {p.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {products.length === 0 && <div className="text-center py-20 text-gray-400 font-bold text-sm bg-white rounded-[2rem] border border-gray-100">در حال حاضر محصولی در ویترین نیست</div>}
+            </div>
+          </div>
+        )}
+
+        {/* پنل مدیریت */}
+        {view === 'admin-panel' && isAdmin && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4">
+            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100">
+              <h2 className="text-lg font-black mb-6 flex items-center gap-2"><Plus className="text-yellow-600"/> افزودن محصول به ویترین</h2>
+              <form onSubmit={addProduct} className="space-y-4">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-[2rem] p-8 cursor-pointer hover:bg-gray-50 transition-all">
+                  <ImageIcon className="text-gray-300 mb-2" size={36} />
+                  <span className="text-xs text-gray-400 font-black">انتخاب عکس از گالری</span>
+                  <input type="file" accept="image/*" className="hidden" name="imgFile" onChange={(e) => handleImage(e, d => e.target.dataset.src = d)} />
+                </label>
+                <input name="name" placeholder="نام طلا (مثل انگشتر رولکس)" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm border-2 border-transparent focus:border-yellow-400 transition-all" required />
+                <div className="grid grid-cols-2 gap-3">
+                  <input name="price" type="number" placeholder="قیمت (تومان)" className="p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
+                  <input name="weight" placeholder="وزن (گرم)" className="p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
+                </div>
+                <input name="phone" placeholder="شماره تماس جهت نمایش" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
+                <textarea name="description" placeholder="توضیحات محصول (اختیاری)" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-bold text-sm h-24 resize-none"></textarea>
+                <button className="w-full bg-yellow-600 text-white py-4.5 rounded-[1.5rem] font-black shadow-lg text-base active:scale-95 transition-all">انتشار در ویترین</button>
+              </form>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-gray-400 text-[11px] font-black px-4 uppercase tracking-widest flex items-center gap-2"><MessageCircle size={14}/> پیام‌های مشتریان</h3>
+              {chatList.map(c => (
+                <button key={c.id} onClick={() => { setActiveChatId(c.id); setView('chat-room'); }} className="w-full bg-white p-5 rounded-3xl flex items-center gap-4 shadow-sm border border-gray-100 active:scale-95 transition-all text-right">
+                  <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400"><User size={24}/></div>
+                  <div className="flex-1 overflow-hidden">
+                    <div className="font-black text-sm text-gray-800">مشتری {c.id ? String(c.id).slice(0,6) : 'ناشناس'}</div>
+                    <p className="text-[11px] text-gray-400 truncate mt-1">{c.last?.text || 'پیام تصویری'}</p>
+                  </div>
+                  <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow-md shadow-yellow-200"></div>
+                </button>
+              ))}
+            </div>
+            
+            <div className="space-y-3 pb-20">
+               <h3 className="text-gray-400 text-[11px] font-black px-4 uppercase tracking-widest">مدیریت موجودی</h3>
+               {products.map(p => (
+                 <div key={p.id} className="bg-white p-3.5 rounded-3xl flex items-center justify-between border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                       <img src={p.image || 'https://via.placeholder.com/150'} className="w-12 h-12 rounded-2xl object-cover" />
+                       <span className="text-xs font-black text-gray-800 truncate">{p.name}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', p.id), {isPinned: !p.isPinned})} className={`p-2.5 rounded-xl transition-all ${p.isPinned ? 'text-yellow-600 bg-yellow-50' : 'text-gray-400 bg-gray-50'}`}><Pin size={18}/></button>
+                      <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', p.id))} className="p-2.5 text-red-500 bg-red-50 rounded-xl"><Trash2 size={18}/></button>
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {/* چت روم */}
+        {view === 'chat-room' && (
+          <div className="h-[82vh] flex flex-col animate-in zoom-in-95">
+            <div className="bg-white rounded-[3rem] shadow-2xl flex flex-col h-full overflow-hidden border border-gray-200">
+              <div className="p-5 border-b flex items-center justify-between bg-white/90 backdrop-blur-md z-10">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setView(isAdmin ? 'admin-panel' : 'home')} className="p-2.5 bg-gra
