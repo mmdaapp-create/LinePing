@@ -1,377 +1,322 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, collection, addDoc, onSnapshot, 
-  doc, deleteDoc, updateDoc 
-} from 'firebase/firestore';
-import { 
-  getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
-} from 'firebase/auth';
-import { 
-  MessageCircle, Phone, Plus, Trash2, 
-  Home, Settings, Send, ChevronLeft,
-  Sparkles, Image as ImageIcon, Lock, 
-  User, BarChart3, X, Pin, CheckCheck,
-  Scale, Info, Copy, Check, MapPin, Reply
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>گالری طلای سپهری | Sepehri Gold</title>
+    
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & Babel for Browser Compilation -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-// --- Firebase Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'sepehri-gold-v5-fixed';
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [view, setView] = useState('home'); 
-  const [products, setProducts] = useState([]);
-  const [allMessages, setAllMessages] = useState([]);
-  const [activeChatId, setActiveChatId] = useState(null);
-  const [replyTo, setReplyTo] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminPass, setAdminPass] = useState('');
-  const [showLogin, setShowLogin] = useState(false);
-  const [contactModal, setContactModal] = useState(null);
-
-  const chatEndRef = useRef(null);
-
-  // قیمت ثابت بازار (شبیه‌ساز نوسان جزئی و واقعی بازار)
-  const [prices, setPrices] = useState({
-    gold18k: 4450000, 
-    gold24k: 5933000,
-    coinEmami: 54200000,
-    lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
-  });
-
-  const shopAddress = "تهران، بازار بزرگ، راسته زرگرها، پلاک ۴۵، گالری طلای سپهری";
-
-  // احراز هویت
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;400;700;900&display=swap');
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
-      } catch (err) {
-        console.error("Auth Error:", err);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
-    return () => unsubscribe();
-  }, []);
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-[#F4F5F7] text-right select-none">
+    <div id="root"></div>
 
-  // بروزرسانی نوسان جزئی بازار هر یک دقیقه
-  useEffect(() => {
-    const updatePrices = () => {
-      setPrices(prev => {
-        const drift = Math.floor((Math.random() * 6000) - 3000); 
-        return {
-          gold18k: prev.gold18k + drift,
-          gold24k: prev.gold24k + Math.floor(drift * 1.33),
-          coinEmami: prev.coinEmami + Math.floor(drift * 12),
-          lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Firebase Scripts Loading ---
+        // Note: Using dynamic imports for Firebase in a single HTML file
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+        // IMPORTANT: Replace with your actual Firebase config
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
         };
-      });
-    };
-    const interval = setInterval(updatePrices, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
-  // دریافت اطلاعات با کنترل خطای ایمن (جلوگیری از صفحه سفید)
-  useEffect(() => {
-    if (!user) return;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const APP_ID = "sepehri-gold-v5-fixed";
 
-    const unsubProd = onSnapshot(
-      collection(db, 'artifacts', appId, 'public', 'data', 'products'),
-      (snapshot) => {
-        const p = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        setProducts(p.sort((a, b) => (b.isPinned ? 1 : -1) - (a.isPinned ? 1 : -1) || (b.timestamp || 0) - (a.timestamp || 0)));
-      },
-      (err) => console.error("Product fetch error:", err)
-    );
+        // Lucide Icon Component Wrapper
+        const Icon = ({ name, size = 20, className = "", ...props }) => {
+            const LucideIcon = lucide.icons[name];
+            return LucideIcon ? <LucideIcon size={size} className={className} {...props} /> : null;
+        };
 
-    const unsubMsg = onSnapshot(
-      collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
-      (snapshot) => {
-        const m = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        setAllMessages(m.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)));
-      },
-      (err) => console.error("Message fetch error:", err)
-    );
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('home'); 
+            const [products, setProducts] = useState([]);
+            const [allMessages, setAllMessages] = useState([]);
+            const [activeChatId, setActiveChatId] = useState(null);
+            const [replyTo, setReplyTo] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [adminPass, setAdminPass] = useState('');
+            const [showLogin, setShowLogin] = useState(false);
+            const [contactModal, setContactModal] = useState(null);
+            const [prices, setPrices] = useState({
+                gold18k: 4450000, 
+                gold24k: 5933000,
+                coinEmami: 54200000,
+                lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+            });
 
-    return () => { unsubProd(); unsubMsg(); };
-  }, [user]);
+            const chatEndRef = useRef(null);
+            const shopAddress = "تهران، بازار بزرگ، راسته زرگرها، پلاک ۴۵، گالری طلای سپهری";
 
-  // اسکرول خودکار چت
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [allMessages, activeChatId, view]);
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        setUser(currentUser);
+                    } else {
+                        signInAnonymously(auth);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
 
-  const handleCopyAndShow = (phone) => {
-    try {
-      const el = document.createElement('textarea');
-      el.value = phone || 'شماره ثبت نشده';
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      setContactModal(phone);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+            useEffect(() => {
+                if (!user) return;
 
-  const handleImage = (e, cb) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => cb(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
+                const unsubProd = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), (snapshot) => {
+                    const p = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setProducts(p.sort((a, b) => (b.isPinned ? 1 : -1) - (a.isPinned ? 1 : -1) || (b.timestamp || 0) - (a.timestamp || 0)));
+                });
 
-  const addProduct = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const img = e.target.imgFile?.dataset?.src;
-    const code = "GS-" + Math.floor(1000 + Math.random() * 9000);
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
-      name: fd.get('name') || '', 
-      price: Number(fd.get('price')) || 0, 
-      phone: fd.get('phone') || '',
-      weight: fd.get('weight') || '',
-      description: fd.get('description') || '',
-      image: img || '', 
-      code, 
-      isPinned: false,
-      timestamp: Date.now()
-    });
-    e.target.reset();
-    if(e.target.imgFile) delete e.target.imgFile.dataset.src;
-  };
+                const unsubMsg = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'messages'), (snapshot) => {
+                    const m = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setAllMessages(m.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)));
+                });
 
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    const text = e.target.msg.value;
-    if (!text || !user) return;
-    const cid = isAdmin ? activeChatId : user.uid;
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
-      chatId: cid || 'general', 
-      sender: user.uid, 
-      text, 
-      timestamp: Date.now(), 
-      isAdmin: isAdmin,
-      replyTo: replyTo ? { text: replyTo.text, id: replyTo.id } : null
-    });
-    e.target.reset();
-    setReplyTo(null);
-  };
+                return () => { unsubProd(); unsubMsg(); };
+            }, [user]);
 
-  const formatPrice = (n) => Number(n || 0).toLocaleString('fa-IR');
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setPrices(prev => ({
+                        ...prev,
+                        gold18k: prev.gold18k + Math.floor(Math.random() * 4000 - 2000),
+                        lastUpdate: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+                    }));
+                }, 60000);
+                return () => clearInterval(interval);
+            }, []);
 
-  // استخراج امن لیست چت‌ها برای جلوگیری از کرش
-  const validMessages = allMessages.filter(m => m && m.chatId);
-  const chatList = Array.from(new Set(validMessages.map(m => m.chatId))).map(id => ({
-    id, last: validMessages.filter(m => m.chatId === id).pop()
-  })).filter(c => c.last); // حذف چت‌های خالی
+            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [allMessages, activeChatId, view]);
 
-  const currentMsgs = allMessages.filter(m => m.chatId === (isAdmin ? activeChatId : user?.uid));
+            const handleCopy = (phone) => {
+                const el = document.createElement('textarea');
+                el.value = phone;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                setContactModal(phone);
+            };
 
-  return (
-    <div className="min-h-screen bg-[#F4F5F7] font-sans text-right pb-32 select-none" dir="rtl">
-      
-      {/* مدال کپی شماره تماس */}
-      {contactModal && (
-        <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-white">
-            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
-              <Check size={32} strokeWidth={3} />
-            </div>
-            <h3 className="text-center font-black text-xl text-gray-800 mb-1">شماره کپی شد!</h3>
-            <p className="text-center text-xs text-gray-500 mb-6">برای تماس، شماره زیر را در گوشی خود پیست کنید.</p>
-            
-            <div className="bg-gray-100 p-5 rounded-3xl text-center mb-6 border-2 border-dashed border-gray-300">
-              <span className="text-3xl font-black tracking-widest text-gray-900">{contactModal}</span>
-            </div>
+            const addProduct = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const code = "GS-" + Math.floor(1000 + Math.random() * 9000);
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), {
+                    name: fd.get('name'), 
+                    price: Number(fd.get('price')), 
+                    phone: fd.get('phone'),
+                    weight: fd.get('weight'),
+                    description: fd.get('description'),
+                    image: e.target.imgData?.value || '', 
+                    code, 
+                    isPinned: false,
+                    timestamp: Date.now()
+                });
+                e.target.reset();
+            };
 
-            <div className="bg-yellow-50 p-4 rounded-2xl flex items-start gap-3 mb-6 border border-yellow-100">
-              <MapPin className="text-yellow-600 shrink-0 mt-0.5" size={18} />
-              <p className="text-[11px] font-bold text-yellow-800 leading-relaxed">{shopAddress}</p>
-            </div>
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                const text = e.target.msg.value;
+                if (!text || !user) return;
+                const cid = isAdmin ? activeChatId : user.uid;
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'messages'), {
+                    chatId: cid, 
+                    sender: user.uid, 
+                    text, 
+                    timestamp: Date.now(), 
+                    isAdmin: isAdmin,
+                    replyTo: replyTo ? { text: replyTo.text, id: replyTo.id } : null
+                });
+                e.target.reset();
+                setReplyTo(null);
+            };
 
-            <button onClick={() => setContactModal(null)} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-black transition-all">
-              متوجه شدم
-            </button>
-          </div>
-        </div>
-      )}
+            const formatPrice = (n) => Number(n).toLocaleString('fa-IR');
 
-      {/* هدر ثابت بالای صفحه */}
-      <nav className="sticky top-0 z-[100] backdrop-blur-2xl bg-white/90 border-b border-gray-200 p-4 flex justify-between items-center px-5 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-yellow-500 to-yellow-600 p-2.5 rounded-[1rem] rotate-3 shadow-lg">
-            <Sparkles className="text-white" size={18} />
-          </div>
-          <div>
-            <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">طلای سپهری</h1>
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-[9px] font-black text-green-600 tracking-widest uppercase">آپدیت زنده: {prices.lastUpdate}</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* دکمه پشتیبانی ثابت در هدر */}
-        {!isAdmin && (
-          <button 
-            onClick={() => { setActiveChatId(user?.uid); setView('chat-room'); }}
-            className="bg-gray-900 text-white pl-4 pr-3 py-2.5 rounded-full flex items-center gap-2 shadow-md hover:bg-black active:scale-95 transition-all relative"
-          >
-            <MessageCircle size={18} />
-            <span className="text-xs font-black">پشتیبانی</span>
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
-          </button>
-        )}
-      </nav>
+            const validMessages = allMessages.filter(m => m && m.chatId);
+            const chatList = Array.from(new Set(validMessages.map(m => m.chatId))).map(id => ({
+                id, last: validMessages.filter(m => m.chatId === id).pop()
+            }));
 
-      <main className="max-w-xl mx-auto p-4 space-y-6">
-        {view === 'home' && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            {/* تابلو قیمت واقعی */}
-            <div className="bg-[#1C1C1E] rounded-[2.5rem] p-6 text-white shadow-2xl relative overflow-hidden border border-white/5">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                <h2 className="text-xs font-black text-yellow-500 flex items-center gap-2 uppercase tracking-widest">
-                  <BarChart3 size={16}/> قیمت واقعی بازار
-                </h2>
-                <TrendingUp size={18} className="text-green-400" />
-              </div>
-              <div className="space-y-5">
-                <div className="flex justify-between items-end">
-                  <span className="text-[11px] text-gray-400 font-bold">طلای ۱۸ عیار (گرم)</span>
-                  <span className="text-2xl font-black text-white tracking-tighter">{formatPrice(prices.gold18k)} <span className="text-[10px] opacity-30">تومان</span></span>
-                </div>
-                <div className="flex justify-between items-end">
-                  <span className="text-[11px] text-gray-400 font-bold">طلای ۲۴ عیار (گرم)</span>
-                  <span className="text-2xl font-black text-yellow-500 tracking-tighter">{formatPrice(prices.gold24k)} <span className="text-[10px] opacity-30">تومان</span></span>
-                </div>
-                <div className="flex justify-between items-end bg-white/5 p-4 rounded-3xl border border-white/5">
-                  <span className="text-[11px] text-yellow-200 font-bold">سکه تمام امامی</span>
-                  <span className="text-2xl font-black text-white tracking-tighter">{formatPrice(prices.coinEmami)} <span className="text-[10px] opacity-30">تومان</span></span>
-                </div>
-              </div>
-            </div>
+            const currentMsgs = allMessages.filter(m => m.chatId === (isAdmin ? activeChatId : user?.uid));
 
-            {/* نمایش آدرس */}
-            <div className="bg-white rounded-3xl p-4 border border-gray-100 flex items-center gap-3 shadow-sm">
-              <div className="bg-yellow-50 p-3 rounded-2xl text-yellow-600"><MapPin size={24}/></div>
-              <div>
-                <h3 className="text-xs font-black text-gray-800 mb-1">آدرس گالری ما</h3>
-                <p className="text-[10px] text-gray-500 font-bold leading-relaxed">{shopAddress}</p>
-              </div>
-            </div>
-
-            {/* ویترین محصولات */}
-            <div className="grid grid-cols-1 gap-5">
-              {products.map(p => (
-                <div key={p.id} className={`bg-white rounded-[2rem] p-4 border shadow-sm flex flex-col gap-4 ${p.isPinned ? 'ring-2 ring-yellow-500/30 border-yellow-200' : 'border-gray-100'}`}>
-                  <div className="flex gap-4">
-                    <div className="relative shrink-0">
-                      <img src={p.image || 'https://via.placeholder.com/150'} className="w-28 h-28 rounded-3xl object-cover border-2 border-gray-50" />
-                      {p.isPinned && <div className="absolute -top-1 -right-1 bg-yellow-500 text-white p-1.5 rounded-full"><Pin size={10} fill="currentColor"/></div>}
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between py-1 overflow-hidden">
-                      <div>
-                        <div className="flex justify-between items-start">
-                          <span className="text-[9px] font-black text-gray-400 uppercase">{p.code || 'نامشخص'}</span>
-                          <span className="text-[10px] font-black text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            <Scale size={10} /> {p.weight || '-'} گرم
-                          </span>
+            return (
+                <div className="min-h-screen pb-32">
+                    {/* Header */}
+                    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b p-4 flex justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-yellow-500 p-2 rounded-xl shadow-lg shadow-yellow-200">
+                                <Icon name="Sparkles" className="text-white" size={18} />
+                            </div>
+                            <div>
+                                <h1 className="font-black text-gray-900 leading-tight">طلای سپهری</h1>
+                                <span className="text-[9px] text-green-600 font-bold uppercase tracking-tighter">آپدیت زنده: {prices.lastUpdate}</span>
+                            </div>
                         </div>
-                        <h3 className="font-black text-gray-800 text-base mt-1 truncate">{p.name}</h3>
-                        <div className="text-yellow-600 font-black text-xl mt-1 tracking-tighter">{formatPrice(p.price)} <span className="text-[10px] font-normal text-gray-400">تومان</span></div>
-                      </div>
-                      <button 
-                        onClick={() => handleCopyAndShow(p.phone)}
-                        className="w-full bg-gray-900 text-white py-3 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black active:scale-95 transition-all mt-2 shadow-md"
-                      >
-                        <Copy size={14} /> تماس و خرید
-                      </button>
-                    </div>
-                  </div>
-                  {p.description && (
-                    <div className="bg-gray-50 p-3.5 rounded-2xl text-[11px] text-gray-600 leading-relaxed font-medium flex items-start gap-2 border border-gray-100">
-                      <Info size={16} className="shrink-0 text-gray-400" />
-                      {p.description}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {products.length === 0 && <div className="text-center py-20 text-gray-400 font-bold text-sm bg-white rounded-[2rem] border border-gray-100">در حال حاضر محصولی در ویترین نیست</div>}
-            </div>
-          </div>
-        )}
+                        {!isAdmin && (
+                            <button onClick={() => { setActiveChatId(user?.uid); setView('chat-room'); }} className="bg-gray-900 text-white px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold active:scale-95 transition-all">
+                                <Icon name="MessageCircle" size={16} /> پشتیبانی
+                            </button>
+                        )}
+                    </nav>
 
-        {/* پنل مدیریت */}
-        {view === 'admin-panel' && isAdmin && (
-          <div className="space-y-8 animate-in slide-in-from-bottom-4">
-            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100">
-              <h2 className="text-lg font-black mb-6 flex items-center gap-2"><Plus className="text-yellow-600"/> افزودن محصول به ویترین</h2>
-              <form onSubmit={addProduct} className="space-y-4">
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-[2rem] p-8 cursor-pointer hover:bg-gray-50 transition-all">
-                  <ImageIcon className="text-gray-300 mb-2" size={36} />
-                  <span className="text-xs text-gray-400 font-black">انتخاب عکس از گالری</span>
-                  <input type="file" accept="image/*" className="hidden" name="imgFile" onChange={(e) => handleImage(e, d => e.target.dataset.src = d)} />
-                </label>
-                <input name="name" placeholder="نام طلا (مثل انگشتر رولکس)" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm border-2 border-transparent focus:border-yellow-400 transition-all" required />
-                <div className="grid grid-cols-2 gap-3">
-                  <input name="price" type="number" placeholder="قیمت (تومان)" className="p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
-                  <input name="weight" placeholder="وزن (گرم)" className="p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
-                </div>
-                <input name="phone" placeholder="شماره تماس جهت نمایش" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-black text-sm" required />
-                <textarea name="description" placeholder="توضیحات محصول (اختیاری)" className="w-full p-4.5 bg-gray-50 rounded-2xl outline-none font-bold text-sm h-24 resize-none"></textarea>
-                <button className="w-full bg-yellow-600 text-white py-4.5 rounded-[1.5rem] font-black shadow-lg text-base active:scale-95 transition-all">انتشار در ویترین</button>
-              </form>
-            </div>
+                    <main className="max-w-xl mx-auto p-4 space-y-6 animate-fade-in">
+                        {view === 'home' && (
+                            <div className="space-y-6">
+                                {/* Price Card */}
+                                <div className="bg-gray-900 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden">
+                                    <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                                        <h2 className="text-xs font-black text-yellow-500 flex items-center gap-2 tracking-widest"><Icon name="BarChart3" size={14}/> نرخ لحظه‌ای بازار</h2>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[11px] text-gray-400">۱۸ عیار (گرم)</span>
+                                            <span className="text-2xl font-black">{formatPrice(prices.gold18k)} <small className="text-[10px] opacity-40">تومان</small></span>
+                                        </div>
+                                        <div className="flex justify-between items-end bg-white/5 p-4 rounded-3xl">
+                                            <span className="text-[11px] text-yellow-500">سکه تمام امامی</span>
+                                            <span className="text-2xl font-black">{formatPrice(prices.coinEmami)} <small className="text-[10px] opacity-40">تومان</small></span>
+                                        </div>
+                                    </div>
+                                </div>
 
-            <div className="space-y-4">
-              <h3 className="text-gray-400 text-[11px] font-black px-4 uppercase tracking-widest flex items-center gap-2"><MessageCircle size={14}/> پیام‌های مشتریان</h3>
-              {chatList.map(c => (
-                <button key={c.id} onClick={() => { setActiveChatId(c.id); setView('chat-room'); }} className="w-full bg-white p-5 rounded-3xl flex items-center gap-4 shadow-sm border border-gray-100 active:scale-95 transition-all text-right">
-                  <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400"><User size={24}/></div>
-                  <div className="flex-1 overflow-hidden">
-                    <div className="font-black text-sm text-gray-800">مشتری {c.id ? String(c.id).slice(0,6) : 'ناشناس'}</div>
-                    <p className="text-[11px] text-gray-400 truncate mt-1">{c.last?.text || 'پیام تصویری'}</p>
-                  </div>
-                  <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full shadow-md shadow-yellow-200"></div>
-                </button>
-              ))}
-            </div>
-            
-            <div className="space-y-3 pb-20">
-               <h3 className="text-gray-400 text-[11px] font-black px-4 uppercase tracking-widest">مدیریت موجودی</h3>
-               {products.map(p => (
-                 <div key={p.id} className="bg-white p-3.5 rounded-3xl flex items-center justify-between border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                       <img src={p.image || 'https://via.placeholder.com/150'} className="w-12 h-12 rounded-2xl object-cover" />
-                       <span className="text-xs font-black text-gray-800 truncate">{p.name}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', p.id), {isPinned: !p.isPinned})} className={`p-2.5 rounded-xl transition-all ${p.isPinned ? 'text-yellow-600 bg-yellow-50' : 'text-gray-400 bg-gray-50'}`}><Pin size={18}/></button>
-                      <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', p.id))} className="p-2.5 text-red-500 bg-red-50 rounded-xl"><Trash2 size={18}/></button>
-                    </div>
-                 </div>
-               ))}
-            </div>
-          </div>
-        )}
+                                {/* Products */}
+                                <div className="space-y-4">
+                                    {products.map(p => (
+                                        <div key={p.id} className="bg-white rounded-[2rem] p-4 border shadow-sm flex flex-col gap-4">
+                                            <div className="flex gap-4">
+                                                <img src={p.image || 'https://via.placeholder.com/100'} className="w-24 h-24 rounded-3xl object-cover bg-gray-50" />
+                                                <div className="flex-1 flex flex-col justify-between py-1">
+                                                    <div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-[9px] font-bold text-gray-400">{p.code}</span>
+                                                            <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg">{p.weight} گرم</span>
+                                                        </div>
+                                                        <h3 className="font-black text-gray-800 mt-1">{p.name}</h3>
+                                                        <div className="text-yellow-600 font-black text-lg mt-1">{formatPrice(p.price)} <span className="text-[10px]">تومان</span></div>
+                                                    </div>
+                                                    <button onClick={() => handleCopy(p.phone)} className="w-full bg-gray-900 text-white py-2 rounded-xl text-[11px] font-black flex justify-center items-center gap-2">
+                                                        <Icon name="Copy" size={14}/> تماس و خرید
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-        {/* چت روم */}
-        {view === 'chat-room' && (
-          <div className="h-[82vh] flex flex-col animate-in zoom-in-95">
-            <div className="bg-white rounded-[3rem] shadow-2xl flex flex-col h-full overflow-hidden border border-gray-200">
-              <div className="p-5 border-b flex items-center justify-between bg-white/90 backdrop-blur-md z-10">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setView(isAdmin ? 'admin-panel' : 'home')} className="p-2.5 bg-gra
+                        {view === 'admin-panel' && isAdmin && (
+                            <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-[2.5rem] shadow-lg border">
+                                    <h2 className="font-black mb-4 flex items-center gap-2"><Icon name="Plus" className="text-yellow-600"/> افزودن کالا</h2>
+                                    <form onSubmit={addProduct} className="space-y-3">
+                                        <input type="file" accept="image/*" onChange={(e) => {
+                                            const reader = new FileReader();
+                                            reader.onload = (f) => document.getElementById('imgData').value = f.target.result;
+                                            reader.readAsDataURL(e.target.files[0]);
+                                        }} className="text-xs" />
+                                        <input id="imgData" type="hidden" />
+                                        <input name="name" placeholder="نام محصول" className="w-full p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" required />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <input name="price" type="number" placeholder="قیمت" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" required />
+                                            <input name="weight" placeholder="وزن" className="p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" required />
+                                        </div>
+                                        <input name="phone" placeholder="شماره تماس" className="w-full p-4 bg-gray-50 rounded-2xl outline-none font-bold text-sm" required />
+                                        <button className="w-full bg-yellow-600 text-white py-4 rounded-2xl font-black">انتشار در ویترین</button>
+                                    </form>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-black text-gray-400 px-2">پیام‌های مشتریان</h3>
+                                    {chatList.map(c => (
+                                        <button key={c.id} onClick={() => { setActiveChatId(c.id); setView('chat-room'); }} className="w-full bg-white p-4 rounded-3xl flex items-center gap-4 border shadow-sm">
+                                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icon name="User" /></div>
+                                            <div className="flex-1 text-right">
+                                                <div className="font-black text-xs">مشتری {c.id.slice(0, 5)}</div>
+                                                <p className="text-[10px] text-gray-400 truncate">{c.last?.text}</p>
+                                            </div>
+                                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'chat-room' && (
+                            <div className="h-[75vh] flex flex-col bg-white rounded-[2.5rem] shadow-xl overflow-hidden border">
+                                <div className="p-4 border-b flex items-center gap-3">
+                                    <button onClick={() => setView(isAdmin ? 'admin-panel' : 'home')} className="p-2 bg-gray-100 rounded-xl"><Icon name="ChevronLeft" className="rotate-180" /></button>
+                                    <div className="font-black text-sm">پشتیبانی آنلاین سپهری</div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 no-scrollbar">
+                                    {currentMsgs.map(m => (
+                                        <div key={m.id} className={`flex flex-col ${m.isAdmin ? 'items-end' : 'items-start'}`}>
+                                            <div className={`max-w-[80%] p-4 rounded-3xl text-sm font-bold shadow-sm ${m.isAdmin ? 'bg-gray-800 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}`}>
+                                                {m.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div ref={chatEndRef} />
+                                </div>
+                                <form onSubmit={sendMessage} className="p-3 border-t flex gap-2">
+                                    <input name="msg" placeholder="پیام شما..." className="flex-1 bg-gray-100 p-3 rounded-2xl outline-none text-sm font-bold" />
+                                    <button className="bg-gray-900 text-white p-3 rounded-2xl"><Icon name="Send" /></button>
+                                </form>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Footer Nav */}
+                    <div className="fixed bottom-6 left-6 right-6 z-40 bg-white/90 backdrop-blur-xl border rounded-[2rem] p-2 flex shadow-2xl">
+                        <button onClick={() => setView('home')} className={`flex-1 flex flex-col items-center py-3 rounded-2xl transition-all ${view === 'home' ? 'bg-yellow-50 text-yellow-700 font-bold' : 'text-gray-400'}`}>
+                            <Icon name="Home" />
+                            <span className="text-[10px] mt-1">ویترین</span>
+                        </button>
+                        <button onClick={() => isAdmin ? setView('admin-panel') : setShowLogin(true)} className={`flex-1 flex flex-col items-center py-3 rounded-2xl transition-all ${view === 'admin-panel' || isAdmin ? 'bg-yellow-50 text-yellow-700 font-bold' : 'text-gray-400'}`}>
+                            <Icon name="Settings" />
+                            <span className="text-[10px] mt-1">مدیریت</span>
+                        </button>
+                    </div>
+
+                    {/* Contact Modal */}
+                    {contactModal && (
+                        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-center animate-fade-in">
+                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Check" size={32} /></div>
+                                <h3 className="font-black text-xl mb-2">شما
